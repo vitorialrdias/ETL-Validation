@@ -1,44 +1,40 @@
-# Agent GCP
+# ETL Validation
 
-Este projeto valida tabelas em diferentes ambientes. O Intuito é receber a mesma tabela e o processo compara quantidade de colunas, quantidade de linhas, tipos das colunas e alguns dados para saber se há ou não inconsistências durante migrações, criações ou alterações nas tabelas
+Essa é uma ferramenta para a validação de integridade de dados entre diferentes ambientes (ex: Pentaho para Python). O projeto compara automaticamente esquemas e dados (linhas, colunas, tipos e valores) para identificar inconsistências decorrentes de migrações ou transformações.
 
-O sistema conta com uma arquitetura modular, testes unitários automatizados e uma interface amigável para o usuário.
-
+## 🚀 Funcionalidades Principais
+- **Validação de Schema:** Comparação estrutural de tabelas (quantidade e tipos de colunas).
+- **Validação de Dados:** Contagem de linhas e verificação de amostras para garantir consistência.
+- **Arquitetura Modular:** Código desacoplado, facilitando a manutenção e expansão.
+- **Interface Amigável:** Painel via Streamlit para execução e visualização de resultados.
+- **Qualidade Assegurada:** Cobertura de testes automatizados com `pytest` e `mocks`.
 ---
 
 ## 🛠️ INSTRUÇÕES DE EXECUÇÃO
 
-**ATENÇÃO!** Para qualquer execução abaixo, você deve estar dentro da raiz do projeto.
+Certifique-se de estar na **raiz do projeto** antes de prosseguir.
 
+### 1. Preparação do Ambiente
+Crie e ative o ambiente virtual para manter as dependências isoladas:
 
-### 1. Para inicializar o ambiente virtual
 ```bash
+# Criar o ambiente virtual
 python -m venv .venv
-```
-### 2. Para ativar o ambiente virtual
-```bash
+
+# Ativar no Windows (PowerShell/CMD)
 .venv\Scripts\activate
 ```
-### 3. Para baixar as bibliotecas utilizadas no projeto
+
+### 2. Dependencias
+Instale as bibliotecas necessárias listadas no requirements.txt:
 ```bash
 pip install -r requirements.txt
 ```
-### 4. Execução pelo StreamLit
-Para iniciar a interface StreamLit:
+### 3. Execução via StreamLit
+Inicie a aplicação web para rodar as validações:
 ```bash
 streamlit run ui_streamlit.py
 ```
-
----
-## 🚀 Tecnologias Utilizadas
-- Python 3.13+: Linguagem base do projeto.
-
-- Pandas: Leitura dos dados no banco de origem e validações.
-
-- Pytest: Framework de testes unitários com Mocks.
-
-- Streamlit: Interface gráfica para interação.
-
 ---
 ## 🧪 Testes Automatizados e Qualidade
 
@@ -48,27 +44,35 @@ O projeto utiliza Testes Unitários com a técnica de Mocking para garantir que 
 python -m pytest
 ```
 ---
-## 🔄 Automação CI/CD
-O projeto está preparado para fluxos de integração contínua:
-
-GitHub Actions: O arquivo em .github/workflows/python-tests.yml executa os testes automaticamente a cada push ou pull request.
-
----
 ## 📁 Estrutura do Projeto
 Plaintext
 
 ```
 \
-├── .github/workflows/   Automação de CI (GitHub Actions)
-├── src/                 Módulos de lógica, ingestão e interface
-├── config/              Módulos de configurações de ambiente e conexões
-├── _test.py             Scripts de testes unitários (Pytest)
-├── pyproject.toml       Configurações globais e ferramentas
-├── requirements.txt     Dependências com versões fixas
-├── architecture.drawio  Arquitetura do projeto
-└── ui_streamlit.py      Script de entrada via interface gráfica
-
+├── .github/workflows/    # CI/CD: Automação com GitHub Actions
+├── config/               # Gerenciamento de credenciais e logs
+├── src/                  # Módulos de lógica central e processamento
+├── tests/                # Testes unitários com Pytest
+├── ui_streamlit.py       # Ponto de entrada da interface gráfica
+├── pyproject.toml        # Configuração do projeto
+├── requirements.txt      # Dependências e versões
+└── architecture.drawio   # Diagrama de arquitetura
 ```
 
 ---
-*Dúvidas ou sugestões? Entre em contato com o mantenedor do projeto.*
+## 🏗️ Stack Tecnológica
+- Python 3.13+: Linguagem base do projeto.
+- Pandas: Leitura dos dados no banco de origem e validações.
+- Conectividade: SQLAlchemy (Otimizado com fast_executemany)
+- Streamlit: Interface gráfica para interação.
+- Pytest: Framework de testes unitários com Mocks.
+
+---
+## 🔄 CI/CD
+O projeto está preparado para fluxos de integração contínua:
+
+GitHub Actions: O arquivo em .github/workflows/python-tests.yml executa os testes automaticamente a cada push ou pull request.
+
+
+---
+*Dúvidas ou sugestões? Entre em contato.*
