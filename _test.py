@@ -1,5 +1,5 @@
 import pandas as pd
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
 
 # Importe suas funções
 from src.read_tables import read_tables
@@ -8,10 +8,11 @@ from src.interface import interface
 
 
 # Simula o retorno do banco para testar se o código sabe lidar com o DF
+@patch("builtins.open", new_callable=mock_open, read_data="{}")
 @patch("json.load")
 @patch("src.read_tables.pd.read_sql")
 @patch("src.read_tables.Database") # Precisamos mocar a classe Database também!
-def test_read_tables(mock_db, mock_read_sql, mock_json_load):
+def test_read_tables(mock_db, mock_read_sql, mock_json_load, mock_file):
     # 1. Ajustamos o JSON para ter a chave 'sql_dw' que seu código pede
     mock_json_load.return_value = {
         "sql_dw": {
