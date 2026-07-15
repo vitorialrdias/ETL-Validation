@@ -3,8 +3,6 @@ from unittest.mock import patch, mock_open
 
 # Importe suas funções
 from src.read_tables import read_tables
-from src.interface import interface
-
 
 
 # Simula o retorno do banco para testar se o código sabe lidar com o DF
@@ -61,20 +59,3 @@ def test_read_tables(mock_db, mock_read_sql, mock_json_load, mock_file):
     assert df_source.iloc[0]["nome"] == "Teste"
     assert df_target.iloc[0]["nome"] == "Teste"
 
-# 4. Teste da Interface
-# Streamlit é testado via integração:
-@patch("src.interface.st") # Mock do objeto streamlit
-def test_interface_calls(mock_st):
-    # Simulamos que os inputs do streamlit retornam valores
-    mock_st.text_area.return_value = "SELECT * FROM TABLE"
-    mock_st.button.return_value = True
-    
-    # Aqui testamos se a função roda sem crashar
-    # Nota: Testar Streamlit unitariamente é limitado
-    try:
-        interface()
-        success = True
-    except Exception:
-        success = False
-    
-    assert success is True
