@@ -152,6 +152,12 @@ class Validate:
 
     def validate_data(self):
         try:
+
+            # ==========================================================
+            # 5. CHECK DATA
+            # ==========================================================
+
+
             common_cols = sorted(list(set(self.df_reference.columns) & set(self.df_target.columns)))
             
             def create_hash(df):
