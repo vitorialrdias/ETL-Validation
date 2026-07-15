@@ -6,7 +6,7 @@ import urllib
 class Database:
     def __init__(self, host, database, user, password, port=3306):
         self.engine = None
-        # Parâmetros fixos para performance
+        
         engine_params = {
             "pool_size": 20, 
             "max_overflow": 12, 
@@ -28,14 +28,14 @@ class Database:
             
             self.engine = create_engine(url, **engine_params)
         except SQLAlchemyError as e:
-            logger.error(f"Erro na inicialização do Engine: {e}")
+            logger.error(f"Error to create engine: {e}")
             raise
 
     def get_connection(self):
-        """Retorna uma conexão ativa."""
+        """Return active connection."""
         return self.engine.connect()
 
     def dispose(self):
-        """Fecha o pool de conexões."""
+        """Close connection."""
         if self.engine:
             self.engine.dispose()

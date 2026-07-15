@@ -17,7 +17,7 @@ def buscar_credencial_por_host(credenciais, host_desejado, ambiente):
 
 def fetch_dataframe(table_info, credenciais):
     """
-    Função auxiliar para ler dados de forma otimizada.
+    Function to read data in an optimized way.
     """
     table_name, env, host_suffix = table_info
     
@@ -49,7 +49,7 @@ def read_tables(source_table, target_table):
     Read and create dataframes using optimized Database class and fast execution.
     """
     try:
-        credenciais = carregar_credenciais('config/credenciais.env')
+        credenciais = carregar_credenciais('config/credentials.env')
         
         # Leitura da Source
         df_source = fetch_dataframe(source_table, credenciais)

@@ -49,4 +49,4 @@ def setup_logging():
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
-    logger.info(f"Pasta de logs criada em: {log_dir}")
+    logger.info(f"Log path created: {log_dir}")

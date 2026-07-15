@@ -1,264 +1,88 @@
-import streamlit as st 
-import pandas as pd
+import streamlit as st
 from config.logging import logger
-
 from src.read_tables import read_tables
+from src.etl_validation import Validate
 
+# Page configuration
+st.set_page_config(page_title="ETL Validation", layout="wide", page_icon="🔍")
 
 def interface():
-    """ Function to validate tables in migration process"""
+    """Main interface for ETL validation process."""
     
-    
-    source = []
-    target = []
-
     if "step" not in st.session_state:
         st.session_state.step = 0
-    try:
-        st.set_page_config(page_title="ETL Validation", layout="wide")
-        st.markdown("""
-            <style>
-                .block-container {
-                    padding-top: 2rem;
-                    padding-bottom: 0rem;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-        st.title("ETL Validation")
+
+    st.title("ETL Validation")
+    st.caption("Compare a reference table with a target table to validate data migration.")
+
+    col1, col2 = st.columns(2, gap="large")
+
+    with col1:
+        st.subheader("Reference Table and Target Table Configuration")
         
+        # Reference Table fields
+        reference_table = st.text_input("Reference table:", placeholder='STG_MRH').upper()
+        c1, c2 = st.columns(2)
+        reference_server = c1.text_input("Reference server:", placeholder='stg, dw').lower()
+        reference_host = c2.selectbox("Reference host:", options=["52", "53"])
 
-        col1, col2 = st.columns(2)
+        st.divider()
+
+        # Target fields
+        target_table = st.text_input("Target table (to validate):", placeholder='STG_MRH').upper()
+        c3, c4 = st.columns(2)
+        target_server = c3.text_input("Target server:", placeholder='stg, dw').lower()
+        target_host = c4.selectbox("Target host:", options=["52", "53"])
+
+        start_validation = st.button("Start validation", use_container_width=True)
+
+    result_container = st.container()
+    with col2:
+        st.subheader("Validation result")
         
-        with col1:
-            st.subheader("Insert the reference table and target table to validate")
-
-            # SOURCE
-            source.append(
-                st.text_input(
-                    "Source table (original table used as reference):",
-                    placeholder='Exemple: STG_MRH'
-                ).upper()
-            )
-
-            
-            c1, c2 = st.columns(2)
-            with c1:
-
-                source.append(
-                    st.text_input(
-                        "Source server:",
-                        placeholder='Exemple: (stg, dw, predial)'
-                    ).lower()
-                )
-
-            
-            with c2:
-                source.append(
-                    st.selectbox(
-                        "Source Host:",
-                        options=["52", "53"],
-                        placeholder="Select the host"
+        if start_validation:
+            # Check if all fields are filled
+            if all([reference_table, reference_server, reference_host, target_table, target_server, target_host]):
+                try:
+                    df_reference, df_target = read_tables(
+                        [reference_table, reference_server, reference_host], 
+                        [target_table, target_server, target_host]
                     )
-                )
-                
-            st.divider()
-            
-            # TARGET
-            target.append(
-                st.text_input(
-                    "Target table (Python migrated table to validate):",
-                    placeholder='Exemple: STG_MRH'
-                ).upper()
-            )
-            c1, c2 = st.columns(2)            
-            with c1:
-
-                target.append(
-                    st.text_input(
-                        "Target server:",
-                        placeholder='Exemple: (stg, dw, predial)'
-                    ).lower()
-                )
-            
-            with c2:
-                target.append(
-                    st.selectbox(
-                        "Target Host:",
-                        options=["52", "53"],
-                        placeholder="Select the host"
-                    )
-                )
-
- 
-            st.markdown("""
-            <style>
-            div.stButton > button {
-                background-color: #CC00;
-                color: white;
-                font-size: 24px;
-                font-weight: bold;
-                border-radius: 10px;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            start_validation = st.button(
-                "Start Validation",
-                use_container_width=True,
-                type="secondary"
-            )
-        with col2:
-            
-            if start_validation:
-                if (
-                    source[0]
-                    and source[1]
-                    and source[2]
-                    and target[0]
-                    and target[1]
-                    and target[2]
-                ):
-                    df_source, df_target = read_tables(source, target)
                     
                     logger.info("Initializing validations...")
-
-                    # ==========================================================
-                    # 1. DATAFRAMES
-                    # ==========================================================
-
-                    if df_source.empty or df_target.empty:
-                        st.error("❌ One or both DataFrames are empty.")
-                        st.stop()
-
-                    st.success("✔ DataFrames loaded successfully.")
-
-
-                    # ==========================================================
-                    # 2. NUMBER OF COLUMNS
-                    # ==========================================================
-
-                    same_num_columns = len(df_source.columns) == len(df_target.columns)
-
-                    if same_num_columns:
-                        st.success(f"✔ Number of columns validated. Source: {len(df_source.columns)} columns | Target: {len(df_target.columns)} columns")
-                        logger.info("Validate number of columns")
-                    else:
-                        st.error(
-                            f"❌ Different number of columns\n\n"
-                            f"Source: {len(df_source.columns)}\n"
-                            f"Target: {len(df_target.columns)}"
-                        )
-
-
-                    # ==========================================================
-                    # 3. COLUMN NAMES
-                    # ==========================================================
-
-                    same_column_names = list(df_source.columns) == list(df_target.columns)
-
-                    if same_column_names:
-                        st.success("✔ Column names validated.")
-                        logger.info("Validate column names")
-
-                    else:
-
-                        st.error("❌ Different column names.")
-
-                        source_cols = set(df_source.columns)
-                        target_cols = set(df_target.columns)
-
-                        all_columns = sorted(source_cols.union(target_cols))
-
-                        df_columns = pd.DataFrame({
-                            "Column": all_columns,
-                            "Source": ["✔" if c in source_cols else "" for c in all_columns],
-                            "Target": ["✔" if c in target_cols else "" for c in all_columns],
-                        })
-
-                        st.dataframe(df_columns, use_container_width=True)
-
-
-                    # ==========================================================
-                    # 4. COLUMN TYPES
-                    # ==========================================================
-
-                    type_errors = []
-
-                    if same_column_names:
-
-                        for col in df_source.columns:
-
-                            if str(df_source[col].dtype) != str(df_target[col].dtype):
-
-                                type_errors.append({
-                                    "Column": col,
-                                    "Source Type": str(df_source[col].dtype),
-                                    "Target Type": str(df_target[col].dtype)
-                                })
-
-                        if type_errors:
-
-                            st.error("❌ Different column types.")
-
-                            st.dataframe(
-                                pd.DataFrame(type_errors),
-                                use_container_width=True
-                            )
-
-                        else:
-
-                            st.success("✔ Column types validated.")
-                            logger.info("Validate column types")
-
-
-                    # ==========================================================
-                    # 5. NUMBER OF ROWS
-                    # ==========================================================
-
-                    same_rows = len(df_source) == len(df_target)
-
-                    if same_rows:
-
-                        st.success(f"✔ Number of rows validated. Source: {len(df_source)} rows | Target: {len(df_target)} rows")
-                        logger.info("Validate number of rows")
-
-                    else:
-
-                        st.error(
-                            f"❌ Different number of rows\n\n"
-                            f"Source: {len(df_source)}\n"
-                            f"Target: {len(df_target)}"
-                        )
-
-
-                    # ==========================================================
-                    # RESULT
-                    # ==========================================================
-
-                    if (
-                        same_num_columns
-                        and same_column_names
-                        and not type_errors
-                        and same_rows
-                    ):
-
+                    validator = Validate(df_reference, df_target)
+                    
+                    # Run validations
+                    same_column_names = validator.validate_column_names()
+                    is_metadata_valid = all([
+                        validator.validate_number_columns(),
+                        same_column_names,
+                        not validator.validate_column_types(),
+                        validator.validate_number_rows()
+                    ])
+                    
+                    # Show data sample if columns match
+                    if is_metadata_valid:
+                        st.divider()
+                        with result_container:
+                            with st.expander("Sample viewer", expanded=True):
+                                data_validation = validator.validate_data()
+                    
+                    # Final result
+                    if is_metadata_valid and data_validation:
                         st.success("✅ Metadata validation completed successfully.")
-
-                        st.session_state["df_source"] = df_source
-                        st.session_state["df_target"] = df_target
                         st.session_state.step = 1
-
                     else:
-
-                        st.warning("Metadata validation finished with inconsistencies.")
-
-
-
-                    return True
-    except Exception as e:
-        st.error(f"Error to upload User Interface: {e}")
-        logger.error(f"Error to upload User Interface: {e}")
-
+                        st.warning("⚠ Metadata validation finished with inconsistencies.")
+                        
+                except Exception as e:
+                    logger.error(f"Validation process error: {e}")
+                    st.error("WARNING! Check the SERVER or TABLE NAME.\n\n"
+                             f"Validation process error: {e}")
+            else:
+                st.error("Please fill in all reference tableand target fields before starting.")
+        else:
+            st.info("Fill in the fields on the left and click **Start validation** to see results here.")
 
 if __name__ == "__main__":
     interface()
