@@ -1,222 +1,261 @@
+# validator.py
+from functools import reduce
+from operator import and_
 import pandas as pd
-import streamlit as st 
-from config.logging import logger
-
-
+from pyspark.sql import functions as F
 
 class Validate:
-    def __init__(self, df_reference, df_target):
-        self.df_reference = df_reference
-        self.df_target = df_target
+    def __init__(self, df_reference, df_target, host_ref, host_target):
+        self.df_ref_spark = df_reference
+        self.df_target_spark = df_target
+        
+        self.host_ref = host_ref
+        self.host_target = host_target
+        
+        self.count_ref = df_reference.count()
+        self.count_target = df_target.count()
 
-        try:
-            # ==========================================================
-            # 1. DATAFRAMES
-            # ==========================================================
+        if self.count_ref == 0 or self.count_target == 0:
+            raise ValueError("One or both DataFrames are empty.")
 
-            if self.df_reference.empty or self.df_target.empty:
-                st.error("❌ One or both DataFrames are empty.")
-                st.stop()
-
-            st.success("✔ DataFrames loaded successfully.")
-            
-        except Exception as e:
-            logger.info(f"Error: One or both DataFrames are empty. {e}")
-            
     def validate_number_columns(self):
-        try:
-
-
-            # ==========================================================
-            # 2. NUMBER OF COLUMNS
-            # ==========================================================
-
-            same_num_columns = len(self.df_reference.columns) == len(self.df_target.columns)
-
-            if same_num_columns:
-                st.success(f"✔ Number of columns validated. Source: {len(self.df_reference.columns)} columns | Target: {len(self.df_target.columns)} columns")
-                logger.info("Validate number of columns")
-            else:
-                st.error(
-                    f"❌ Different number of columns\n\n"
-                    f"Source: {len(self.df_reference.columns)}\n"
-                    f"Target: {len(self.df_target.columns)}"
-                )
-                
-            return same_num_columns
-
-        except Exception as e:
-            logger.info(f"Error: Different number of columns. {e}")
+        cols_ref = len(self.df_ref_spark.columns)
+        cols_target = len(self.df_target_spark.columns)
+        return cols_ref == cols_target, cols_ref, cols_target
 
     def validate_column_names(self):
-        try:
-            
-            # ==========================================================
-            # 3. COLUMN NAMES
-            # ==========================================================
+        names_ref = set(self.df_ref_spark.columns)
+        names_target = set(self.df_target_spark.columns)
 
-            same_column_names = list(self.df_reference.columns) == list(self.df_target.columns)
+        if names_ref == names_target:
+            return True, None, names_ref, names_target
 
-            if same_column_names:
-                st.success("✔ Column names validated.")
-                logger.info("Validate column names")
+        all_cols = sorted(names_ref.union(names_target))
 
-            else:
+        diff_df = pd.DataFrame({
+            "Column": all_cols,
+            f"Target host ({self.host_target})": ["✔" if c in names_target else "" for c in all_cols],
+            f"Reference host ({self.host_ref})": ["✔" if c in names_ref else "" for c in all_cols],
+        })
 
-                st.error("❌ Different column names.")
+        return False, diff_df, names_ref, names_target
 
-                reference_cols = set(self.df_reference.columns)
-                target_cols = set(self.df_target.columns)
-
-                all_columns = sorted(reference_cols.union(target_cols))
-
-                df_columns = pd.DataFrame({
-                    "Column": all_columns,
-                    "Source": ["✔" if c in reference_cols else "" for c in all_columns],
-                    "Target": ["✔" if c in target_cols else "" for c in all_columns],
-                })
-
-                st.dataframe(df_columns, use_container_width=True)
-                
-            return same_column_names
-        except Exception as e:
-            logger.info(f"Error: Different column names. {e}")
-
-    
     def validate_column_types(self):
+        types_ref = dict(self.df_ref_spark.dtypes)
+        types_target = dict(self.df_target_spark.dtypes)
         
-        try:
-            # ==========================================================
-            # 4. COLUMN TYPES
-            # ==========================================================
-
-            type_errors = []
-
-
-            for col in self.df_reference.columns:
-
-                if str(self.df_reference[col].dtype) != str(self.df_target[col].dtype):
-
-                    type_errors.append({
-                        "Column": col,
-                        "Source Type": str(self.df_reference[col].dtype),
-                        "Target Type": str(self.df_target[col].dtype)
-                    })
-
-            if type_errors:
-
-                st.error("❌ Different column types.")
-
-                st.dataframe(
-                    pd.DataFrame(type_errors),
-                    use_container_width=True
-                )
-
-            else:
-
-                st.success("✔ Column types validated.")
-                logger.info("Validate column types")
+        type_errors = [
+            {"Column": col, "Reference": types_ref[col], "Target": types_target[col]}
+            for col in self.df_ref_spark.columns
+            if col in types_target and types_ref[col] != types_target[col]
+        ]
         
-            return type_errors
-            
-        except Exception as e:
-            logger.info(f"Error: Different column types. {e}")
-
+        if not type_errors:
+            return True, None
+        
+        return False, pd.DataFrame(type_errors)
 
     def validate_number_rows(self):
-        
-        try:
-            
-            # ==========================================================
-            # 5. NUMBER OF ROWS
-            # ==========================================================
+        return self.count_ref == self.count_target
 
-            same_rows = len(self.df_reference) == len(self.df_target)
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
 
-            if same_rows:
+    @staticmethod
+    def _detect_id_column(cols):
+        lower_map = {c.lower(): c for c in cols}
 
-                st.success(f"✔ Number of rows validated. Source: {len(self.df_reference)} rows | Target: {len(self.df_target)} rows")
-                logger.info("Validate number of rows")
+        if "id" in lower_map:
+            return lower_map["id"]
 
-            else:
+        id_like = [c for c in cols if c.lower().endswith("_id")]
+        if len(id_like) == 1:
+            return id_like[0]
 
-                st.error(
-                    f"❌ Different number of rows\n\n"
-                    f"Source: {len(self.df_reference)}\n"
-                    f"Target: {len(self.df_target)}"
-                )
-            
-            return same_rows
-        except Exception as e:
-            logger.info(f"Error: Different number of rows. {e}")
+        return None
+
+
+    @staticmethod
+    def _normalize_value(v):
+
+        if v is None:
+            return None
+
+        if isinstance(v, bool):
+            return v
+
+        if isinstance(v, int):
+            return v
+
+        if isinstance(v, float):
+            return round(v, 6)
+
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+
+        if isinstance(v, str):
+            return None if v.strip() == "" else v.strip()
+
+        return v
+
+
+    def _normalize_row(self, row, cols):
+        return {
+            c: self._normalize_value(row.get(c))
+            for c in cols
+        }
+
+
+    # ------------------------------------------------------------------
+    # Procura registro correspondente na referência
+    # ------------------------------------------------------------------
+
+    def _find_reference(self, target_row, cols, id_col):
+
+        # Caso exista ID
+        if id_col:
+
+            rows = (
+                self.df_ref_spark
+                .filter(F.col(id_col) == target_row[id_col])
+                .limit(1)
+                .collect()
+            )
+
+            if rows:
+                return rows[0].asDict()
+
+            return None
+
+        # -------------------------------------------------------
+        # Sem ID -> usa chave composta
+        # -------------------------------------------------------
+
+        key_columns = [
+            c for c in cols
+            if self._normalize_value(target_row.get(c)) not in (None, "")
+        ]
+
+        if not key_columns:
+            return None
+
+        filtro = reduce(
+            and_,
+            [
+                F.col(c) == target_row[c]
+                for c in key_columns
+            ]
+        )
+
+        rows = (
+            self.df_ref_spark
+            .filter(filtro)
+            .limit(1)
+            .collect()
+        )
+
+        if rows:
+            return rows[0].asDict()
+
+        return None
+
+
+    # ------------------------------------------------------------------
+    # Validação
+    # ------------------------------------------------------------------
 
     def validate_data(self):
-        try:
 
-            # ==========================================================
-            # 5. CHECK DATA
-            # ==========================================================
+        self.df_ref_spark = self.df_ref_spark.drop(
+            "DT_ATUALIZACAO",
+            "DATA_ATUALIZACAO",
+            "DT_INCLUSAO",
+            "DATA_INCLUSAO"
+        )
 
+        self.df_target_spark = self.df_target_spark.drop(
+            "DT_ATUALIZACAO",
+            "DATA_ATUALIZACAO",
+            "DT_INCLUSAO",
+            "DATA_INCLUSAO"
+        )
 
-            common_cols = sorted(list(set(self.df_reference.columns) & set(self.df_target.columns)))
-            
-            def create_hash(df):
-                return df[common_cols].fillna("").astype(str).agg("|".join, axis=1)
+        target_rows = self.df_target_spark.limit(10).collect()
 
-            reference = self.df_reference[common_cols].copy()
-            target = self.df_target[common_cols].copy()
-            
-            reference["_row_hash"] = create_hash(reference)
-            target["_row_hash"] = create_hash(target)
+        if not target_rows:
+            return {
+                "status": "empty_sample",
+                "message": "No rows found."
+            }
 
-            # Found divergent
-            missing_in_target = set(reference["_row_hash"]) - set(target["_row_hash"])
-            missing_in_reference = set(target["_row_hash"]) - set(reference["_row_hash"])
+        cols = self.df_target_spark.columns
 
-            if not missing_in_target and not missing_in_reference:
-                st.success("✔ Data sample validated.")
-                sample = reference.drop(columns=["_row_hash"]).sample(n=min(4, len(reference)), random_state=42)
-                st.subheader("Sample (4 examples)")
-                st.dataframe(sample, use_container_width=True)
-                return True
+        id_col = self._detect_id_column(cols)
 
-            # Show divergents
-            st.error("❌ Divergent data found.")
-            
-            def get_diff_df(df, hash_list):
-                return df[df["_row_hash"].isin(hash_list)].drop(columns=["_row_hash"]).sort_values(common_cols).reset_index(drop=True)
+        divergent_target = []
+        divergent_reference = []
 
-            diff_reference = get_diff_df(reference, missing_in_target)
-            diff_target = get_diff_df(target, missing_in_reference)
+        for target in target_rows:
 
-            def show_diff(df_to_show, ref_df, title, is_target=False):
-                st.subheader(title)
-                
-                if df_to_show.empty:
-                    st.caption(f"No conflicting records found in {title.split(' ')[0].lower()}.")
-                elif len(df_to_show) == len(ref_df):
-                    # Define a cor baseada no tipo de tabela
-                    # Verde (#22C55E) para referência, Amarelo (#EAB308) para erro no target
-                    color = "#22C55E" if not is_target else "#EAB308"
-                    
-                    def style_row(row):
-                        return [f"background-color: {color}33; color: {color}; font-weight: 600;" 
-                                if str(val) != str(ref_df.loc[row.name, col]) else "" 
-                                for col, val in row.items()]
-                    
-                    st.dataframe(df_to_show.style.apply(style_row, axis=1), use_container_width=True)
-                else:
-                    st.caption("⚠ Unable to perform cell-by-cell comparison (different record counts).")
-                    st.dataframe(df_to_show, use_container_width=True)
+            target_dict = target.asDict()
 
-            # Chamada das funções
-            show_diff(diff_reference, diff_target, "Source - reference records", is_target=False)
-            show_diff(diff_target, diff_reference, "Target - incorrect records", is_target=True)
-                        
-            return False
+            ref_dict = self._find_reference(
+                target_dict,
+                cols,
+                id_col
+            )
 
-        except Exception as e:
-            msg = f"Structural validation error: {e}"
-            logger.error(msg)
-            st.error(msg)
-            return False
+            # Não encontrou na referência
+            if ref_dict is None:
+
+                divergent_target.append(target_dict)
+
+                divergent_reference.append(
+                    {c: None for c in cols}
+                )
+
+                continue
+
+            norm_target = self._normalize_row(
+                target_dict,
+                cols
+            )
+
+            norm_ref = self._normalize_row(
+                ref_dict,
+                cols
+            )
+
+            if norm_target != norm_ref:
+
+                divergent_target.append(target_dict)
+
+                divergent_reference.append(ref_dict)
+
+        if not divergent_target:
+
+            return {
+                "status": "success",
+                "id_col": id_col,
+                "sample_df": pd.DataFrame(
+                    [r.asDict() for r in target_rows]
+                )
+            }
+
+        return {
+
+            "status": "divergent",
+            "id_col": id_col,
+            "count_mismatched": len(divergent_target),
+            "diff_target": pd.DataFrame(
+                divergent_target,
+                columns=cols
+            ),
+            "diff_reference": pd.DataFrame(
+                divergent_reference,
+                columns=cols
+            ),
+            "cols": cols
+
+        }

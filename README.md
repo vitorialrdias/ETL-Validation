@@ -1,6 +1,7 @@
 # ETL Validation
 
-Essa é uma ferramenta para a validação de integridade de dados entre diferentes ambientes (ex: Desenvolvimento para Homologação). O projeto compara automaticamente esquemas e dados (linhas, colunas, tipos e valores) para identificar inconsistências decorrentes de migrações ou transformações.
+Essa é uma ferramenta para a validação de integridade de dados entre diferentes ambientes (ex: Desenvolvimento para Homologação). 
+.
 
 ## 🚀 Funcionalidades Principais
 
